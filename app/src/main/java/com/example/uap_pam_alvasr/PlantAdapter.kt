@@ -54,21 +54,56 @@ class PlantAdapter(
     }
 
     private fun deletePlant(plant: Plant, position: Int) {
-        // Disable button sementara
-        val holder = items.indexOf(plant)
-        if (holder >= 0) {
-            // Optional: Show loading state
-        }
+        Log.d("PlantAdapter", "🗑️ Attempting to delete plant: '${plant.plant_name}'")
 
-        // Encode nama untuk URL yang aman
-        val encodedName = try {
-            URLEncoder.encode(plant.plant_name, "UTF-8")
+        // Buat encoding options dengan urutan yang benar
+        val encodingOptions = mutableListOf<String>()
+
+        try {
+            // 1. Standard URL encoding dulu
+            val urlEncoded = URLEncoder.encode(plant.plant_name, "UTF-8")
+            encodingOptions.add(urlEncoded)
+
+            // 2. Original jika berbeda
+            if (urlEncoded != plant.plant_name) {
+                encodingOptions.add(plant.plant_name)
+            }
+
+            // 3. Manual replacements jika ada space
+            if (plant.plant_name.contains(" ")) {
+                val spaceToPlus = plant.plant_name.replace(" ", "+")
+                if (!encodingOptions.contains(spaceToPlus)) {
+                    encodingOptions.add(spaceToPlus)
+                }
+
+                val spaceToPercent = plant.plant_name.replace(" ", "%20")
+                if (!encodingOptions.contains(spaceToPercent)) {
+                    encodingOptions.add(spaceToPercent)
+                }
+            }
+
         } catch (e: Exception) {
-            plant.plant_name
+            Log.e("PlantAdapter", "Error creating encoding options", e)
+            encodingOptions.add(plant.plant_name)
         }
 
-        Log.d("PlantAdapter", "Deleting plant: '${plant.plant_name}'")
-        Log.d("PlantAdapter", "Encoded name: '$encodedName'")
+        Log.d("PlantAdapter", "Trying ${encodingOptions.size} encoding methods: $encodingOptions")
+
+        // Disable button selama proses
+        notifyItemChanged(position)
+
+        tryDeleteWithEncodingOptions(plant, position, encodingOptions, 0)
+    }
+
+    private fun tryDeleteWithEncodingOptions(plant: Plant, position: Int, options: List<String>, index: Int) {
+        if (index >= options.size) {
+            Log.e("PlantAdapter", "❌ All ${options.size} delete encoding options failed")
+            Toast.makeText(ctx, "Gagal menghapus dengan semua metode encoding", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val encodedName = options[index]
+        Log.d("PlantAdapter", "🔄 Trying delete with encoding ${index + 1}/${options.size}: '$encodedName'")
 
         RetrofitClient.instance.deletePlant(encodedName)
             .enqueue(object : Callback<GenericResponse> {
@@ -76,39 +111,60 @@ class PlantAdapter(
                     call: Call<GenericResponse>,
                     response: Response<GenericResponse>
                 ) {
-                    Log.d("PlantAdapter", "Delete request URL: ${call.request().url}")
+                    val requestUrl = call.request().url.toString()
+                    Log.d("PlantAdapter", "Delete request URL: $requestUrl")
                     Log.d("PlantAdapter", "Delete response code: ${response.code()}")
 
                     when {
                         response.isSuccessful -> {
-                            // Remove item dari list dan update RecyclerView
+                            // Berhasil hapus
                             val currentPosition = items.indexOf(plant)
                             if (currentPosition >= 0) {
                                 items.removeAt(currentPosition)
                                 notifyItemRemoved(currentPosition)
-                                // Update posisi item yang ada setelah penghapusan
                                 notifyItemRangeChanged(currentPosition, items.size)
                             }
-                            Toast.makeText(ctx, "Item berhasil dihapus", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(ctx, "✅ Item berhasil dihapus", Toast.LENGTH_SHORT).show()
+                            Log.d("PlantAdapter", "✅ Delete successful with encoding ${index + 1}")
                         }
+
+                        response.code() == 404 && index < options.size - 1 -> {
+                            Log.d("PlantAdapter", "❌ Delete encoding ${index + 1} returned 404, trying next")
+                            tryDeleteWithEncodingOptions(plant, position, options, index + 1)
+                        }
+
                         response.code() == 404 -> {
+                            Log.e("PlantAdapter", "❌ Item not found with any encoding method")
                             Toast.makeText(ctx, "Item tidak ditemukan", Toast.LENGTH_SHORT).show()
                         }
+
                         else -> {
                             val errorMsg = try {
                                 response.errorBody()?.string() ?: "Unknown error"
                             } catch (e: Exception) {
                                 "Error: ${response.code()}"
                             }
-                            Log.e("PlantAdapter", "Delete error: $errorMsg")
-                            Toast.makeText(ctx, "Gagal menghapus: ${response.code()}", Toast.LENGTH_SHORT).show()
+                            Log.e("PlantAdapter", "❌ Delete error with encoding ${index + 1}: $errorMsg")
+
+                            if (index < options.size - 1) {
+                                Log.d("PlantAdapter", "Trying next delete encoding...")
+                                tryDeleteWithEncodingOptions(plant, position, options, index + 1)
+                            } else {
+                                Toast.makeText(ctx, "Gagal menghapus: ${response.code()}", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     }
                 }
 
                 override fun onFailure(call: Call<GenericResponse>, t: Throwable) {
-                    Log.e("PlantAdapter", "Delete failed", t)
-                    Toast.makeText(ctx, "Error jaringan: ${t.message}", Toast.LENGTH_SHORT).show()
+                    Log.e("PlantAdapter", "❌ Delete network error with encoding ${index + 1}: ${t.message}", t)
+
+                    if (index < options.size - 1) {
+                        Log.d("PlantAdapter", "Network error, trying next delete encoding...")
+                        tryDeleteWithEncodingOptions(plant, position, options, index + 1)
+                    } else {
+                        Toast.makeText(ctx, "Error jaringan: ${t.message}", Toast.LENGTH_SHORT).show()
+                    }
                 }
             })
     }
