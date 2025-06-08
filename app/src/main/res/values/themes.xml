@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Tema terang aplikasi -->
+    <style name="Theme.UAP_PAM_AlvaSR" parent="Theme.AppCompat.Light.NoActionBar">
+        <!-- kustom warna kalau perlu -->
+        <item name="colorPrimary">@color/green_primary</item>
+        <item name="colorPrimaryDark">@color/green_primary_dark</item>
+        <item name="colorAccent">@color/green_accent</item>
+    </style>
+
+</resources>

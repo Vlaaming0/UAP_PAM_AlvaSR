@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F4F9FF"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:padding="24dp">
+
+        <!-- Logo -->
+        <ImageView
+            android:id="@+id/imageLogo"
+            android:layout_width="150dp"
+            android:layout_height="150dp"
+            android:layout_marginTop="48dp"
+            android:src="@drawable/logo_tree"
+            android:contentDescription="Logo" />
+
+        <!-- Title -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Register"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="#000000"
+            android:layout_marginTop="16dp" />
+
+        <!-- Email Label -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Email"
+            android:textStyle="bold"
+            android:textSize="50px"
+            android:layout_marginTop="32dp"
+            android:layout_marginBottom="10dp"
+            android:layout_marginStart="-158dp"/>
+
+        <!-- Email Input -->
+        <EditText
+            android:id="@+id/editTextEmail"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@drawable/edittext_border"
+            android:hint="Email"
+            android:padding="12dp"
+            android:inputType="textEmailAddress" />
+
+        <!-- Password Label -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Password"
+            android:textStyle="bold"
+            android:textSize="50px"
+            android:layout_marginTop="32dp"
+            android:layout_marginBottom="10dp"
+            android:layout_marginStart="-140dp"/>
+
+        <!-- Password Input -->
+        <EditText
+            android:id="@+id/editTextPassword"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@drawable/edittext_border"
+            android:hint="Password"
+            android:padding="12dp"
+            android:inputType="textPassword" />
+
+        <!-- Confirm Password Label -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Konfirmasi Password"
+            android:textStyle="bold"
+            android:textSize="50px"
+            android:layout_marginTop="32dp"
+            android:layout_marginBottom="10dp"
+            android:layout_marginStart="-90dp"/>
+
+        <!-- Confirm Password Input -->
+        <EditText
+            android:id="@+id/editTextConfirmPassword"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@drawable/edittext_border"
+            android:hint="Masukkan nama tanaman"
+            android:padding="12dp"
+            android:inputType="textPassword" />
+
+        <!-- Register Button -->
+        <Button
+            android:id="@+id/buttonRegister"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="Register"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#6BD160"
+            android:layout_marginTop="24dp"
+            android:background="@drawable/button_background" />
+
+    </LinearLayout>
+</ScrollView>

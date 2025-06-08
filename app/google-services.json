@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "953635840260",
+    "project_id": "uap-pam-alvasr",
+    "storage_bucket": "uap-pam-alvasr.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:953635840260:android:b3b95d1e617bbac9007051",
+        "android_client_info": {
+          "package_name": "com.example.uap_pam_alvasr"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAtg7TY86jHayTfGKCBdD4XV7Ts0ao6HVo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
