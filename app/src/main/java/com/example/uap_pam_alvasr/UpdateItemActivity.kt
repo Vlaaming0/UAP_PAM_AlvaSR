@@ -44,12 +44,14 @@ class UpdateItemActivity : AppCompatActivity() {
 
         // Set form dengan data yang sudah ada jika tersedia
         if (plantName.isNotEmpty()) {
+            Log.d("UpdateActivity", "Using data from intent")
             edNama.setText(plantName)
             edHarga.setText(plantPrice)
             edDesc.setText(plantDesc)
             setFormEnabled(true)
         } else {
             // Jika tidak ada data dari intent, load dari API
+            Log.d("UpdateActivity", "Data from intent is empty, loading from API")
             loadDataFromAPI()
         }
 
@@ -67,36 +69,52 @@ class UpdateItemActivity : AppCompatActivity() {
 
         setFormEnabled(false)
 
-        // Encode nama untuk URL yang aman
-        val encodedName = try {
-            URLEncoder.encode(originalNameKey, "UTF-8")
-        } catch (e: Exception) {
-            originalNameKey
+        // Coba beberapa metode encoding
+        val possibleEncodings = listOf(
+            originalNameKey, // Original tanpa encoding
+            try { URLEncoder.encode(originalNameKey, "UTF-8") } catch (e: Exception) { originalNameKey },
+            originalNameKey.replace(" ", "%20"), // Manual space encoding
+            originalNameKey.replace(" ", "+") // Plus encoding
+        ).distinct()
+
+        Log.d("UpdateActivity", "Trying encodings: $possibleEncodings")
+
+        tryLoadWithDifferentEncodings(possibleEncodings, 0)
+    }
+
+    private fun tryLoadWithDifferentEncodings(encodings: List<String>, index: Int) {
+        if (index >= encodings.size) {
+            setFormEnabled(true)
+            Toast.makeText(this, "Gagal memuat data dengan semua encoding", Toast.LENGTH_SHORT).show()
+            return
         }
 
-        Log.d("UpdateActivity", "Loading data for: '$originalNameKey'")
-        Log.d("UpdateActivity", "Encoded name: '$encodedName'")
+        val encodedName = encodings[index]
+        Log.d("UpdateActivity", "Trying encoding $index: '$encodedName'")
 
         RetrofitClient.instance.getPlant(encodedName)
             .enqueue(object : Callback<PlantResponse> {
                 override fun onResponse(call: Call<PlantResponse>, resp: Response<PlantResponse>) {
-                    setFormEnabled(true)
-
                     Log.d("UpdateActivity", "Request URL: ${call.request().url}")
                     Log.d("UpdateActivity", "Response code: ${resp.code()}")
 
                     when {
                         resp.isSuccessful && resp.body() != null -> {
                             val plant = resp.body()!!.data
-                            Log.d("UpdateActivity", "Plant loaded: ${plant.plant_name}")
+                            Log.d("UpdateActivity", "Plant loaded successfully: ${plant.plant_name}")
 
                             edNama.setText(plant.plant_name)
                             edHarga.setText(plant.price)
                             edDesc.setText(plant.description)
+                            setFormEnabled(true)
+                        }
+                        resp.code() == 404 && index < encodings.size - 1 -> {
+                            Log.d("UpdateActivity", "Encoding $index failed with 404, trying next")
+                            tryLoadWithDifferentEncodings(encodings, index + 1)
                         }
                         resp.code() == 404 -> {
+                            setFormEnabled(true)
                             Toast.makeText(this@UpdateItemActivity, "Data tidak ditemukan", Toast.LENGTH_SHORT).show()
-                            finish()
                         }
                         else -> {
                             val errorMsg = try {
@@ -105,15 +123,28 @@ class UpdateItemActivity : AppCompatActivity() {
                                 "Error reading response"
                             }
                             Log.e("UpdateActivity", "Error response: $errorMsg")
-                            Toast.makeText(this@UpdateItemActivity, "Gagal memuat data: ${resp.code()}", Toast.LENGTH_SHORT).show()
+
+                            if (index < encodings.size - 1) {
+                                Log.d("UpdateActivity", "Encoding $index failed with ${resp.code()}, trying next")
+                                tryLoadWithDifferentEncodings(encodings, index + 1)
+                            } else {
+                                setFormEnabled(true)
+                                Toast.makeText(this@UpdateItemActivity, "Gagal memuat data: ${resp.code()}", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     }
                 }
 
                 override fun onFailure(call: Call<PlantResponse>, t: Throwable) {
-                    setFormEnabled(true)
-                    Log.e("UpdateActivity", "API call failed", t)
-                    Toast.makeText(this@UpdateItemActivity, "Error jaringan: ${t.message}", Toast.LENGTH_SHORT).show()
+                    Log.e("UpdateActivity", "API call failed for encoding $index", t)
+
+                    if (index < encodings.size - 1) {
+                        Log.d("UpdateActivity", "Network error for encoding $index, trying next")
+                        tryLoadWithDifferentEncodings(encodings, index + 1)
+                    } else {
+                        setFormEnabled(true)
+                        Toast.makeText(this@UpdateItemActivity, "Error jaringan: ${t.message}", Toast.LENGTH_SHORT).show()
+                    }
                 }
             })
     }
@@ -128,16 +159,25 @@ class UpdateItemActivity : AppCompatActivity() {
             return
         }
 
-        setFormEnabled(false)
-
-        // Encode nama asli untuk URL
-        val encodedOriginalName = try {
-            URLEncoder.encode(originalNameKey, "UTF-8")
-        } catch (e: Exception) {
-            originalNameKey
+        // Validasi harga
+        try {
+            newPrice.toDouble()
+        } catch (e: NumberFormatException) {
+            Toast.makeText(this, "Harga harus berupa angka", Toast.LENGTH_SHORT).show()
+            return
         }
 
-        Log.d("UpdateActivity", "Updating plant with key: '$originalNameKey'")
+        setFormEnabled(false)
+
+        // Encode nama asli untuk URL - coba beberapa metode
+        val possibleEncodings = listOf(
+            originalNameKey,
+            try { URLEncoder.encode(originalNameKey, "UTF-8") } catch (e: Exception) { originalNameKey },
+            originalNameKey.replace(" ", "%20"),
+            originalNameKey.replace(" ", "+")
+        ).distinct()
+
+        Log.d("UpdateActivity", "Updating plant with original key: '$originalNameKey'")
         Log.d("UpdateActivity", "New data: name='$newName', price='$newPrice'")
 
         val updateRequest = PlantUpdateRequest(
@@ -146,23 +186,41 @@ class UpdateItemActivity : AppCompatActivity() {
             price = newPrice
         )
 
-        RetrofitClient.instance.updatePlant(encodedOriginalName, updateRequest)
+        tryUpdateWithDifferentEncodings(possibleEncodings, 0, updateRequest)
+    }
+
+    private fun tryUpdateWithDifferentEncodings(encodings: List<String>, index: Int, updateRequest: PlantUpdateRequest) {
+        if (index >= encodings.size) {
+            setFormEnabled(true)
+            Toast.makeText(this, "Update gagal dengan semua encoding", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val encodedName = encodings[index]
+        Log.d("UpdateActivity", "Trying update with encoding $index: '$encodedName'")
+
+        RetrofitClient.instance.updatePlant(encodedName, updateRequest)
             .enqueue(object : Callback<PlantResponse> {
                 override fun onResponse(call: Call<PlantResponse>, resp: Response<PlantResponse>) {
-                    setFormEnabled(true)
-
                     Log.d("UpdateActivity", "Update request URL: ${call.request().url}")
                     Log.d("UpdateActivity", "Update response code: ${resp.code()}")
 
                     when {
                         resp.isSuccessful -> {
+                            setFormEnabled(true)
                             Toast.makeText(this@UpdateItemActivity, "Update berhasil", Toast.LENGTH_SHORT).show()
                             finish()
                         }
+                        resp.code() == 404 && index < encodings.size - 1 -> {
+                            Log.d("UpdateActivity", "Update encoding $index failed with 404, trying next")
+                            tryUpdateWithDifferentEncodings(encodings, index + 1, updateRequest)
+                        }
                         resp.code() == 404 -> {
+                            setFormEnabled(true)
                             Toast.makeText(this@UpdateItemActivity, "Data tidak ditemukan", Toast.LENGTH_SHORT).show()
                         }
                         resp.code() == 400 -> {
+                            setFormEnabled(true)
                             Toast.makeText(this@UpdateItemActivity, "Data tidak valid", Toast.LENGTH_SHORT).show()
                         }
                         else -> {
@@ -172,15 +230,28 @@ class UpdateItemActivity : AppCompatActivity() {
                                 "Error: ${resp.code()}"
                             }
                             Log.e("UpdateActivity", "Update error: $errorMsg")
-                            Toast.makeText(this@UpdateItemActivity, "Update gagal: ${resp.code()}", Toast.LENGTH_SHORT).show()
+
+                            if (index < encodings.size - 1) {
+                                Log.d("UpdateActivity", "Update encoding $index failed with ${resp.code()}, trying next")
+                                tryUpdateWithDifferentEncodings(encodings, index + 1, updateRequest)
+                            } else {
+                                setFormEnabled(true)
+                                Toast.makeText(this@UpdateItemActivity, "Update gagal: ${resp.code()}", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     }
                 }
 
                 override fun onFailure(call: Call<PlantResponse>, t: Throwable) {
-                    setFormEnabled(true)
-                    Log.e("UpdateActivity", "Update failed", t)
-                    Toast.makeText(this@UpdateItemActivity, "Error jaringan: ${t.message}", Toast.LENGTH_SHORT).show()
+                    Log.e("UpdateActivity", "Update failed for encoding $index", t)
+
+                    if (index < encodings.size - 1) {
+                        Log.d("UpdateActivity", "Network error for update encoding $index, trying next")
+                        tryUpdateWithDifferentEncodings(encodings, index + 1, updateRequest)
+                    } else {
+                        setFormEnabled(true)
+                        Toast.makeText(this@UpdateItemActivity, "Error jaringan: ${t.message}", Toast.LENGTH_SHORT).show()
+                    }
                 }
             })
     }
