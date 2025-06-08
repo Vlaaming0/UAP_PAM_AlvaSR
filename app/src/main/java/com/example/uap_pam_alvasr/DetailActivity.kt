@@ -39,59 +39,10 @@ class DetailActivity : AppCompatActivity() {
         btnUpd.isEnabled = false
         btnUpd.text = "Loading..."
 
-        // 👇 TAMBAHKAN LOG
         Log.d("DetailActivity", "namaKey dari intent: '$namaKey'")
 
-        // Encode nama untuk URL yang aman
-        val encodedName = try {
-            URLEncoder.encode(namaKey, "UTF-8")
-        } catch (e: Exception) {
-            namaKey
-        }
-
-        Log.d("DetailActivity", "Encoded name for API: '$encodedName'")
-
-        RetrofitClient.instance.getPlant(encodedName)
-            .enqueue(object : Callback<PlantResponse> {
-                override fun onResponse(call: Call<PlantResponse>, resp: Response<PlantResponse>) {
-                    Log.d("DetailActivity", "API Request URL: ${call.request().url}")
-                    Log.d("DetailActivity", "API Response code: ${resp.code()}")
-
-                    if (resp.isSuccessful) {
-                        resp.body()?.let { plantResponse ->
-                            val plant = plantResponse.data
-
-                            // 👇 SIMPAN DATA KE VARIABLE
-                            currentPlantName = plant.plant_name
-                            currentPlantPrice = plant.price
-                            currentPlantDesc = plant.description
-                            isDataLoaded = true
-
-                            tvNama.text = plant.plant_name
-                            tvHarga.text = "Rp ${plant.price}"
-                            tvDesc.text = plant.description
-
-                            // Enable button setelah data berhasil dimuat
-                            btnUpd.isEnabled = true
-                            btnUpd.text = "Update"
-
-                            // 👇 TAMBAHKAN LOG
-                            Log.d("DetailActivity", "Data berhasil dimuat: $currentPlantName")
-                        }
-                    } else {
-                        Log.e("DetailActivity", "API Error: ${resp.code()}")
-                        Toast.makeText(this@DetailActivity, "Gagal memuat data: ${resp.code()}", Toast.LENGTH_SHORT).show()
-                        btnUpd.isEnabled = true
-                        btnUpd.text = "Update"
-                    }
-                }
-                override fun onFailure(call: Call<PlantResponse>, t: Throwable) {
-                    Log.e("DetailActivity", "Failed to load: ${t.message}")
-                    Toast.makeText(this@DetailActivity, "Error jaringan: ${t.message}", Toast.LENGTH_SHORT).show()
-                    btnUpd.isEnabled = true
-                    btnUpd.text = "Update"
-                }
-            })
+        // PERBAIKAN: Coba beberapa metode encoding
+        loadPlantData(namaKey)
 
         btnUpd.setOnClickListener {
             if (!isDataLoaded) {
@@ -99,7 +50,6 @@ class DetailActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // 👇 PERBAIKI PENGIRIMAN DATA
             Log.d("DetailActivity", "Mengirim namaKey: '$namaKey'")
             Log.d("DetailActivity", "Mengirim currentPlantName: '$currentPlantName'")
 
@@ -111,5 +61,102 @@ class DetailActivity : AppCompatActivity() {
             }
             startActivity(intent)
         }
+    }
+
+    private fun loadPlantData(namaKey: String) {
+        // Coba beberapa metode encoding untuk mengatasi masalah URL
+        val encodingOptions = listOf(
+            namaKey, // Original tanpa encoding
+            URLEncoder.encode(namaKey, "UTF-8"), // Standard URL encoding
+            namaKey.replace(" ", "+"), // Plus encoding untuk space
+            namaKey.replace(" ", "%20") // Manual space encoding
+        ).distinct() // Hapus duplikat
+
+        Log.d("DetailActivity", "Trying encoding options: $encodingOptions")
+
+        tryLoadWithEncodingOptions(encodingOptions, 0)
+    }
+
+    private fun tryLoadWithEncodingOptions(options: List<String>, index: Int) {
+        if (index >= options.size) {
+            // Semua encoding gagal
+            Log.e("DetailActivity", "All encoding options failed")
+            Toast.makeText(this, "Gagal memuat data dengan semua metode encoding", Toast.LENGTH_LONG).show()
+            btnUpd.isEnabled = true
+            btnUpd.text = "Update"
+            return
+        }
+
+        val encodedName = options[index]
+        Log.d("DetailActivity", "Trying encoding option $index: '$encodedName'")
+
+        RetrofitClient.instance.getPlant(encodedName)
+            .enqueue(object : Callback<PlantResponse> {
+                override fun onResponse(call: Call<PlantResponse>, resp: Response<PlantResponse>) {
+                    Log.d("DetailActivity", "API Request URL: ${call.request().url}")
+                    Log.d("DetailActivity", "API Response code: ${resp.code()}")
+
+                    when {
+                        resp.isSuccessful && resp.body() != null -> {
+                            // Berhasil!
+                            val plant = resp.body()!!.data
+
+                            currentPlantName = plant.plant_name
+                            currentPlantPrice = plant.price
+                            currentPlantDesc = plant.description
+                            isDataLoaded = true
+
+                            findViewById<TextView>(R.id.tvNama).text = plant.plant_name
+                            findViewById<TextView>(R.id.tvHarga).text = "Rp ${plant.price}"
+                            findViewById<TextView>(R.id.tvDeskripsi).text = plant.description
+
+                            btnUpd.isEnabled = true
+                            btnUpd.text = "Update"
+
+                            Log.d("DetailActivity", "Data berhasil dimuat dengan encoding $index: $currentPlantName")
+                        }
+
+                        resp.code() == 404 && index < options.size - 1 -> {
+                            // 404 tapi masih ada opsi lain, coba yang berikutnya
+                            Log.d("DetailActivity", "Encoding option $index returned 404, trying next")
+                            tryLoadWithEncodingOptions(options, index + 1)
+                        }
+
+                        resp.code() == 404 -> {
+                            // 404 dan ini opsi terakhir
+                            Log.e("DetailActivity", "Data not found with any encoding method")
+                            Toast.makeText(this@DetailActivity, "Data tanaman tidak ditemukan", Toast.LENGTH_SHORT).show()
+                            btnUpd.isEnabled = true
+                            btnUpd.text = "Update"
+                        }
+
+                        else -> {
+                            // Error lain, coba opsi berikutnya jika ada
+                            Log.e("DetailActivity", "API Error with encoding $index: ${resp.code()}")
+                            if (index < options.size - 1) {
+                                tryLoadWithEncodingOptions(options, index + 1)
+                            } else {
+                                Toast.makeText(this@DetailActivity, "Gagal memuat data: ${resp.code()}", Toast.LENGTH_SHORT).show()
+                                btnUpd.isEnabled = true
+                                btnUpd.text = "Update"
+                            }
+                        }
+                    }
+                }
+
+                override fun onFailure(call: Call<PlantResponse>, t: Throwable) {
+                    Log.e("DetailActivity", "Network error with encoding $index: ${t.message}")
+
+                    if (index < options.size - 1) {
+                        // Masih ada opsi lain, coba
+                        tryLoadWithEncodingOptions(options, index + 1)
+                    } else {
+                        // Opsi terakhir juga gagal
+                        Toast.makeText(this@DetailActivity, "Error jaringan: ${t.message}", Toast.LENGTH_SHORT).show()
+                        btnUpd.isEnabled = true
+                        btnUpd.text = "Update"
+                    }
+                }
+            })
     }
 }
