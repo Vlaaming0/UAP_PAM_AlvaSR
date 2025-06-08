@@ -1,18 +1,20 @@
-// PlantAdapter.kt
 package com.example.uap_pam_alvasr
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
+import java.net.URLEncoder
 
 class PlantAdapter(
     private val ctx: Context,
@@ -40,24 +42,75 @@ class PlantAdapter(
         holder.iv.setImageResource(R.drawable.tumbuhan)
 
         holder.btnDel.setOnClickListener {
-            RetrofitClient.instance.deletePlant(plant.plant_name)
-                .enqueue(object : Callback<GenericResponse> {
-                    override fun onResponse(
-                        call: Call<GenericResponse>,
-                        response: Response<GenericResponse>
-                    ) {
-                        items.removeAt(position)
-                        notifyItemRemoved(position)
-                    }
-                    override fun onFailure(call: Call<GenericResponse>, t: Throwable) { }
-                })
+            deletePlant(plant, position)
         }
+
         holder.btnDet.setOnClickListener {
-            ctx.startActivity(
-                Intent(ctx, DetailActivity::class.java)
-                    .putExtra("nama", plant.plant_name)
-            )
+            val intent = Intent(ctx, DetailActivity::class.java).apply {
+                putExtra("nama", plant.plant_name)
+            }
+            ctx.startActivity(intent)
         }
+    }
+
+    private fun deletePlant(plant: Plant, position: Int) {
+        // Disable button sementara
+        val holder = items.indexOf(plant)
+        if (holder >= 0) {
+            // Optional: Show loading state
+        }
+
+        // Encode nama untuk URL yang aman
+        val encodedName = try {
+            URLEncoder.encode(plant.plant_name, "UTF-8")
+        } catch (e: Exception) {
+            plant.plant_name
+        }
+
+        Log.d("PlantAdapter", "Deleting plant: '${plant.plant_name}'")
+        Log.d("PlantAdapter", "Encoded name: '$encodedName'")
+
+        RetrofitClient.instance.deletePlant(encodedName)
+            .enqueue(object : Callback<GenericResponse> {
+                override fun onResponse(
+                    call: Call<GenericResponse>,
+                    response: Response<GenericResponse>
+                ) {
+                    Log.d("PlantAdapter", "Delete request URL: ${call.request().url}")
+                    Log.d("PlantAdapter", "Delete response code: ${response.code()}")
+
+                    when {
+                        response.isSuccessful -> {
+                            // Remove item dari list dan update RecyclerView
+                            val currentPosition = items.indexOf(plant)
+                            if (currentPosition >= 0) {
+                                items.removeAt(currentPosition)
+                                notifyItemRemoved(currentPosition)
+                                // Update posisi item yang ada setelah penghapusan
+                                notifyItemRangeChanged(currentPosition, items.size)
+                            }
+                            Toast.makeText(ctx, "Item berhasil dihapus", Toast.LENGTH_SHORT).show()
+                        }
+                        response.code() == 404 -> {
+                            Toast.makeText(ctx, "Item tidak ditemukan", Toast.LENGTH_SHORT).show()
+                        }
+                        else -> {
+                            val errorMsg = try {
+                                response.errorBody()?.string() ?: "Unknown error"
+                            } catch (e: Exception) {
+                                "Error: ${response.code()}"
+                            }
+                            Log.e("PlantAdapter", "Delete error: $errorMsg")
+                            Toast.makeText(ctx, "Gagal menghapus: ${response.code()}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+
+                override fun onFailure(call: Call<GenericResponse>, t: Throwable) {
+                    Log.e("PlantAdapter", "Delete failed", t)
+                    Toast.makeText(ctx, "Error jaringan: ${t.message}", Toast.LENGTH_SHORT).show()
+                }
+            })
     }
 
     override fun getItemCount(): Int = items.size
