@@ -65,34 +65,25 @@ class DetailActivity : AppCompatActivity() {
 
     private fun loadPlantData(namaKey: String) {
         // PERBAIKAN: Urutan encoding yang lebih logis dan menghindari double encoding
+        // Ganti blok kode pembuatan encodingOptions di dalam fungsi yang relevan (misal: loadPlantData, deletePlant, tryLoadWithDifferentEncodings, tryUpdateWithDifferentEncodings)
         val encodingOptions = mutableListOf<String>()
 
         try {
-            // 1. Standard URL encoding - ini yang paling umum digunakan
-            val urlEncoded = URLEncoder.encode(namaKey, "UTF-8")
-            encodingOptions.add(urlEncoded)
+            // Opsi 1: URL encoding standar (mengubah spasi menjadi '+').
+            // Berdasarkan log Anda, URL ini kadang berhasil dikirim tanpa re-encoding oleh Retrofit.
+            val urlEncodedPlus = URLEncoder.encode(namaKey, "UTF-8")
+            encodingOptions.add(urlEncodedPlus)
 
-            // 2. Original tanpa encoding - untuk nama sederhana
-            if (urlEncoded != namaKey) {
+            // Opsi 2: String asli. Retrofit secara default akan mengubah spasi menjadi '%20'
+            // saat digunakan dengan @Path, dan tidak akan double-encoding karakter lain seperti '-'.
+            // Ini adalah cara paling umum dan disarankan untuk @Path.
+            if (!encodingOptions.contains(namaKey)) { // Tambahkan hanya jika berbeda dari opsi pertama
                 encodingOptions.add(namaKey)
             }
 
-            // 3. Manual space replacement (hanya jika ada space)
-            if (namaKey.contains(" ")) {
-                val spaceToPlus = namaKey.replace(" ", "+")
-                if (!encodingOptions.contains(spaceToPlus)) {
-                    encodingOptions.add(spaceToPlus)
-                }
-
-                val spaceToPercent = namaKey.replace(" ", "%20")
-                if (!encodingOptions.contains(spaceToPercent)) {
-                    encodingOptions.add(spaceToPercent)
-                }
-            }
-
         } catch (e: Exception) {
-            Log.e("DetailActivity", "Error creating encoding options", e)
-            encodingOptions.add(namaKey) // Fallback ke original
+            Log.e("TAG_ANDA", "Error creating encoding options", e) // Ganti TAG_ANDA dengan tag log yang sesuai (misal: DetailActivity, PlantAdapter)
+            encodingOptions.add(namaKey) // Fallback jika terjadi kesalahan encoding
         }
 
         Log.d("DetailActivity", "Trying ${encodingOptions.size} encoding options: $encodingOptions")

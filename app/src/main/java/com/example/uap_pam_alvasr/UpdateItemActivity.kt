@@ -170,12 +170,23 @@ class UpdateItemActivity : AppCompatActivity() {
         setFormEnabled(false)
 
         // Encode nama asli untuk URL - coba beberapa metode
-        val possibleEncodings = listOf(
-            originalNameKey,
-            try { URLEncoder.encode(originalNameKey, "UTF-8") } catch (e: Exception) { originalNameKey },
-            originalNameKey.replace(" ", "%20"),
-            originalNameKey.replace(" ", "+")
-        ).distinct()
+        // Dalam UpdateItemActivity.kt, ganti blok kode pembuatan possibleEncodings di dalam fungsi loadDataFromAPI
+        val possibleEncodings = mutableListOf<String>()
+
+        try {
+            // Opsi 1: URL encoding standar (mengubah spasi menjadi '+').
+            val urlEncodedPlus = URLEncoder.encode(originalNameKey, "UTF-8")
+            possibleEncodings.add(urlEncodedPlus)
+
+            // Opsi 2: String asli. Retrofit secara otomatis akan mengubah spasi menjadi '%20'.
+            if (!possibleEncodings.contains(originalNameKey)) {
+                possibleEncodings.add(originalNameKey)
+            }
+
+        } catch (e: Exception) {
+            Log.e("UpdateActivity", "Error creating encoding options for load", e)
+            possibleEncodings.add(originalNameKey) // Fallback jika terjadi kesalahan encoding
+        }
 
         Log.d("UpdateActivity", "Updating plant with original key: '$originalNameKey'")
         Log.d("UpdateActivity", "New data: name='$newName', price='$newPrice'")

@@ -60,31 +60,18 @@ class PlantAdapter(
         val encodingOptions = mutableListOf<String>()
 
         try {
-            // 1. Standard URL encoding dulu
-            val urlEncoded = URLEncoder.encode(plant.plant_name, "UTF-8")
-            encodingOptions.add(urlEncoded)
+            // Opsi 1: URL encoding standar (mengubah spasi menjadi '+').
+            val urlEncodedPlus = URLEncoder.encode(plant.plant_name, "UTF-8")
+            encodingOptions.add(urlEncodedPlus)
 
-            // 2. Original jika berbeda
-            if (urlEncoded != plant.plant_name) {
+            // Opsi 2: String asli. Retrofit secara otomatis akan mengubah spasi menjadi '%20'.
+            if (!encodingOptions.contains(plant.plant_name)) {
                 encodingOptions.add(plant.plant_name)
-            }
-
-            // 3. Manual replacements jika ada space
-            if (plant.plant_name.contains(" ")) {
-                val spaceToPlus = plant.plant_name.replace(" ", "+")
-                if (!encodingOptions.contains(spaceToPlus)) {
-                    encodingOptions.add(spaceToPlus)
-                }
-
-                val spaceToPercent = plant.plant_name.replace(" ", "%20")
-                if (!encodingOptions.contains(spaceToPercent)) {
-                    encodingOptions.add(spaceToPercent)
-                }
             }
 
         } catch (e: Exception) {
             Log.e("PlantAdapter", "Error creating encoding options", e)
-            encodingOptions.add(plant.plant_name)
+            encodingOptions.add(plant.plant_name) // Fallback jika terjadi kesalahan encoding
         }
 
         Log.d("PlantAdapter", "Trying ${encodingOptions.size} encoding methods: $encodingOptions")
